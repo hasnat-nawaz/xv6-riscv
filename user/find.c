@@ -5,15 +5,15 @@
 #include "kernel/fs.h"
 #include "kernel/fcntl.h"
 
-// Run "cmd ... path" for a match found by -exec
+// Run "cmd ... path" for one match found by -exec.
+// The parent waits for the child to finish.
 void
 runcmd(char *path, int cmdc, char **cmdv)
 {
   char *args[MAXARG];
-  int i;
-  int pid;
+  int i, pid;
 
-  // need room for command args + matched path + NULL
+  // Command words, the matched path, and a terminating NULL.
   if (cmdc + 2 > MAXARG) {
     fprintf(2, "find: too many arguments\n");
     return;
@@ -29,19 +29,17 @@ runcmd(char *path, int cmdc, char **cmdv)
     fprintf(2, "find: fork failed\n");
     return;
   }
-
   if (pid == 0) {
     exec(args[0], args);
     fprintf(2, "find: exec %s failed\n", args[0]);
     exit(1);
   }
-  
   if (wait(0) < 0)
-  fprintf(2, "find: wait failed\n");
+    fprintf(2, "find: wait failed\n");
 }
 
-// Recursively search under path for entries named `name`.
-// If cmdc == 0, print matches; otherwise run cmdv via -exec.
+// Walk the tree under path looking for entries named name.
+// cmdc == 0 prints matches; otherwise each match is passed to runcmd.
 void
 find(char *path, char *name, int cmdc, char **cmdv)
 {
@@ -67,6 +65,7 @@ find(char *path, char *name, int cmdc, char **cmdv)
       close(fd);
       return;
     }
+
     strcpy(buf, path);
     p = buf + strlen(buf);
     *p++ = '/';
@@ -75,11 +74,11 @@ find(char *path, char *name, int cmdc, char **cmdv)
       if (de.inum == 0)
         continue;
 
-      // dirent names are fixed-width; force a C string
+      // Directory names are fixed width and may lack a trailing NUL.
       memmove(p, de.name, DIRSIZ);
       p[DIRSIZ] = 0;
 
-      // avoid infinite recursion on . and ..
+      // "." and ".." would recurse forever.
       if (strcmp(p, ".") == 0 || strcmp(p, "..") == 0)
         continue;
 
@@ -95,7 +94,6 @@ find(char *path, char *name, int cmdc, char **cmdv)
           runcmd(buf, cmdc, cmdv);
       }
 
-      // descend into subdirectories
       if (st.type == T_DIR)
         find(buf, name, cmdc, cmdv);
     }
@@ -106,11 +104,11 @@ find(char *path, char *name, int cmdc, char **cmdv)
 int
 main(int argc, char *argv[])
 {
-  // find <dir> <name>
   if (argc == 3) {
+    // find <directory> <name>
     find(argv[1], argv[2], 0, 0);
   } else if (argc >= 5 && strcmp(argv[3], "-exec") == 0) {
-    // find <dir> <name> -exec <cmd> [args...]
+    // find <directory> <name> -exec <cmd> [args...]
     find(argv[1], argv[2], argc - 4, argv + 4);
   } else {
     fprintf(2, "usage: find directory name [-exec cmd ...]\n");

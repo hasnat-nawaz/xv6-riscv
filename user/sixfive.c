@@ -2,46 +2,50 @@
 #include "kernel/fcntl.h"
 #include "user/user.h"
 
-// Scan one input stream (file or stdin) for numbers that are multiples of 5 or 6.
-// A number is digits bounded by separators in " -\r\t\n./," (also SOF/EOF).
+// Print numbers in fd that are multiples of 5 or 6.
+// A number is a run of digits bounded by separators in " -\r\t\n./,".
+// Start and end of the stream also count as separators.
 void
 sixfive(int fd)
 {
-  char n;
-  int isNum = 0;    // 1 if current digit run started after a separator
-  int isEmpty = 1;  // 1 if we are not holding a number
-  int value = 0;
+  char c;
+  int in_num;   // 1 while a valid digit run is being built
+  int poisoned; // 1 if a letter broke the current run (e.g. "xv6")
+  int value;
+  int n;
 
-  while (read(fd, &n, 1) > 0) {
-    if (strchr(" -\r\t\n./,", n)) {
-      // Separator ends a number — print if it is a multiple of 5 or 6
-      if (!isEmpty && isNum && (value % 5 == 0 || value % 6 == 0)) {
+  in_num = 0;
+  poisoned = 0;
+  value = 0;
+
+  while ((n = read(fd, &c, 1)) > 0) {
+    if (strchr(" -\r\t\n./,", c)) {
+      // A separator ends the current number.
+      if (in_num && !poisoned && (value % 5 == 0 || value % 6 == 0))
         printf("%d\n", value);
-        isNum = 0;
-      } else {
-        isNum = 1;  // next digits may start a new number
-      }
-      isEmpty = 1;
+      in_num = 0;
+      poisoned = 0;
       value = 0;
-    } else if (n >= '0' && n <= '9') {
-      // Digits after a letter (e.g. xv6) are not a valid number
-      if (!isEmpty && !isNum) {
+    } else if (c >= '0' && c <= '9') {
+      // Digits after a letter are not a number.
+      if (poisoned)
         continue;
-      } else {
-        value = value * 10 + (n - '0');
-        isNum = 1;
-        isEmpty = 0;
-      }
+      value = value * 10 + (c - '0');
+      in_num = 1;
     } else {
-      // Non-separator, non-digit: poison the current run
-      isEmpty = 0;
-      isNum = 0;
+      // Non-digit, non-separator: this run is not a number.
+      poisoned = 1;
+      in_num = 0;
       value = 0;
     }
   }
+  if (n < 0) {
+    fprintf(2, "sixfive: read error\n");
+    exit(1);
+  }
 
-  // EOF is an implicit separator — flush a trailing number
-  if (!isEmpty && isNum && (value % 5 == 0 || value % 6 == 0))
+  // EOF is an implicit separator.
+  if (in_num && !poisoned && (value % 5 == 0 || value % 6 == 0))
     printf("%d\n", value);
 }
 
@@ -50,13 +54,12 @@ main(int argc, char *argv[])
 {
   int fd, i;
 
-  // No filenames → read stdin (fd 0)
+  // No file names: read standard input.
   if (argc <= 1) {
     sixfive(0);
     exit(0);
   }
 
-  // Otherwise open each file and process it
   for (i = 1; i < argc; i++) {
     if ((fd = open(argv[i], O_RDONLY)) < 0) {
       fprintf(2, "sixfive: cannot open %s\n", argv[i]);

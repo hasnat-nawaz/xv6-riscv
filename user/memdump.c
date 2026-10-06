@@ -2,13 +2,13 @@
 #include "kernel/fcntl.h"
 #include "user/user.h"
 
-void memdump(char *fmt, char *data, int len);
+void memdump(char *, char *, int);
 
 int
 main(int argc, char *argv[])
 {
   if (argc == 1) {
-    // Built-in demos when run with no args: $ memdump
+    // Built-in examples used when memdump is run with no arguments.
     printf("Example 1:\n");
     int a[2] = {61810, 2026};
     memdump("ii", (char *)a, sizeof(a));
@@ -18,7 +18,7 @@ main(int argc, char *argv[])
 
     printf("Example 3:\n");
     char *s = "another";
-    // Pass &s so format 's' reads the pointer value itself
+    // &s: format 's' reads the pointer value, not the string bytes.
     memdump("s", (char *)&s, sizeof(s));
 
     struct sss {
@@ -39,35 +39,41 @@ main(int argc, char *argv[])
     memdump("pihcS", (char *)&example, sizeof(example));
 
     printf("Example 5:\n");
-    // 's' prints "hello"; next 'c's read bytes of num1 (look like "world")
     memdump("sccccc", (char *)&example, sizeof(example));
   } else if (argc == 2) {
-    // Format from argv[1]; payload from stdin until EOF
+    // Format string is argv[1]; bytes come from standard input.
     char data[512];
-    int n = 0;
-    memset(data, '\0', sizeof(data));
+    int n, nn;
+
+    n = 0;
+    memset(data, 0, sizeof(data));
     while (n < sizeof(data)) {
-      int nn = read(0, data + n, sizeof(data) - n);
-      if (nn <= 0)
+      nn = read(0, data + n, sizeof(data) - n);
+      if (nn < 0) {
+        fprintf(2, "memdump: read error\n");
+        exit(1);
+      }
+      if (nn == 0)
         break;
       n += nn;
     }
     memdump(argv[1], data, n);
   } else {
-    printf("Usage: memdump [format]\n");
+    fprintf(2, "Usage: memdump [format]\n");
     exit(1);
   }
   exit(0);
 }
 
-// Print len bytes at data according to fmt:
-// i=4B int, p=8B hex, h=2B short, c=1B char,
-// s=8B pointer to string, S=string in remaining data
+// Dump len bytes at data.
+// i: 4-byte decimal, p: 8-byte hex, h: 2-byte decimal, c: 1 byte,
+// s: 8-byte pointer to a string, S: string in the remaining bytes.
 void
 memdump(char *fmt, char *data, int len)
 {
-  int left = len;
+  int left;
 
+  left = len;
   while (*fmt) {
     switch (*fmt) {
     case 'i':
@@ -121,14 +127,13 @@ memdump(char *fmt, char *data, int len)
       break;
 
     case 'S':
-      // Print until '\0' or end of valid data
+      // Stop at the null byte or at the end of the valid data.
       while (left > 0 && *data != '\0') {
         printf("%c", *data);
         data += 1;
         left -= 1;
       }
       printf("\n");
-      // Skip the null terminator if it is still inside the buffer
       if (left > 0) {
         data += 1;
         left -= 1;
