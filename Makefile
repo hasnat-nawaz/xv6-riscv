@@ -154,9 +154,11 @@ UPROGS=\
 	$U/_sixfive\
 	$U/_memdump\
 	$U/_find\
+	$U/_sandbox\
+	$U/_sbtest\
 
-fs.img: mkfs/mkfs README sixfive.txt $(UPROGS)
-	mkfs/mkfs fs.img README sixfive.txt $(UPROGS)
+fs.img: mkfs/mkfs README sixfive.txt user/exec.sh $(UPROGS)
+	mkfs/mkfs fs.img README sixfive.txt user/exec.sh $(UPROGS)
 
 -include kernel/*.d user/*.d
 
