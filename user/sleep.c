@@ -6,6 +6,7 @@
 int
 main(int argc, char *argv[])
 {
+  char *p;
   int ticks;
 
   if (argc < 2) {
@@ -13,7 +14,15 @@ main(int argc, char *argv[])
     exit(1);
   }
 
-  // Command-line args arrive as strings.
+  // Command-line args arrive as strings; atoi would silently
+  // turn a non-numeric one into 0, so reject it here.
+  for (p = argv[1]; *p; p++) {
+    if (*p < '0' || *p > '9') {
+      fprintf(2, "sleep: %s is not a number of ticks\n", argv[1]);
+      exit(1);
+    }
+  }
+
   ticks = atoi(argv[1]);
   if (pause(ticks) < 0) {
     fprintf(2, "sleep: pause failed\n");

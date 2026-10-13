@@ -139,6 +139,10 @@ memdump(char *fmt, char *data, int len)
         left -= 1;
       }
       break;
+
+    default:
+      printf("memdump: unknown format character '%c'\n", *fmt);
+      return;
     }
     fmt++;
   }
