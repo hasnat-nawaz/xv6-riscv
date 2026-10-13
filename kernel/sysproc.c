@@ -110,3 +110,22 @@ sys_uptime(void)
   release(&tickslock);
   return xticks;
 }
+
+// Sandbox the calling process: reject the system calls named by the
+// bits of mask.  Children inherit the sandbox across fork.
+uint64
+sys_interpose(void)
+{
+  struct proc *p = myproc();
+  int mask;
+
+  argint(0, &mask);
+
+  // Only once: a sandboxed process must not be able to lift its own
+  // restrictions by calling interpose again.
+  if (p->sbmask != 0)
+    return -1;
+
+  p->sbmask = mask;
+  return 0;
+}
