@@ -135,6 +135,21 @@ static uint64 (*syscalls[])(void) = {
   // clang-format on
 };
 
+// Does the sandbox of p reject system call num?  A masked open or exec
+// is still allowed if it names the path the sandbox permits.
+static int
+sbreject(struct proc *p, int num)
+{
+  char path[MAXPATH];
+
+  if ((p->sbmask & (1 << num)) == 0)
+    return 0;
+  if (num == SYS_open || num == SYS_exec)
+    if (argstr(0, path, MAXPATH) >= 0 && strncmp(path, p->sbpath, MAXPATH) == 0)
+      return 0;
+  return 1;
+}
+
 void
 syscall(void)
 {
@@ -145,7 +160,7 @@ syscall(void)
   if (num > 0 && num < NELEM(syscalls) && syscalls[num]) {
     // A sandboxed process must not run the calls its mask names;
     // the call fails but the process keeps running.
-    if (p->sbmask & (1 << num)) {
+    if (sbreject(p, num)) {
       p->trapframe->a0 = -1;
       return;
     }

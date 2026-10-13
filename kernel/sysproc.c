@@ -112,20 +112,25 @@ sys_uptime(void)
 }
 
 // Sandbox the calling process: reject the system calls named by the
-// bits of mask.  Children inherit the sandbox across fork.
+// bits of mask, except for an open or exec of path.  Children inherit
+// the sandbox across fork.
 uint64
 sys_interpose(void)
 {
   struct proc *p = myproc();
+  char path[MAXPATH];
   int mask;
 
   argint(0, &mask);
+  if (argstr(1, path, MAXPATH) < 0)
+    return -1;
 
   // Only once: a sandboxed process must not be able to lift its own
   // restrictions by calling interpose again.
   if (p->sbmask != 0)
     return -1;
 
+  safestrcpy(p->sbpath, path, sizeof(p->sbpath));
   p->sbmask = mask;
   return 0;
 }

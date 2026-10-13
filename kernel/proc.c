@@ -168,6 +168,7 @@ freeproc(struct proc *p)
   p->killed = 0;
   p->xstate = 0;
   p->sbmask = 0;
+  p->sbpath[0] = 0;
   p->state = UNUSED;
 }
 
@@ -292,6 +293,7 @@ kfork(void)
 
   // A child is confined by the same sandbox as its parent.
   np->sbmask = p->sbmask;
+  safestrcpy(np->sbpath, p->sbpath, sizeof(np->sbpath));
 
   pid = np->pid;
 

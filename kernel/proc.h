@@ -102,4 +102,5 @@ struct proc {
   struct inode *cwd;           // Current directory
   char name[16];               // Process name (debugging)
   int sbmask;                  // Sandbox: system calls to reject
+  char sbpath[MAXPATH];        // Sandbox: path open and exec may still use
 };
