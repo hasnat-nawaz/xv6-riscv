@@ -1,0 +1,65 @@
+Q1. Looking at the backtrace output, which function called syscall?
+
+usertrap(), in kernel/trap.c, called syscall().  The backtrace was:
+
+    #0  syscall () at kernel/syscall.c:138
+    #1  0x00000000800025fe in usertrap () at kernel/trap.c:68
+    #2  0x0000003ffffff09c in ?? ()
+
+Frame #2 has no name because it is the trampoline page, which is
+assembly and has no debug information.
+
+
+Q2. What is the value of p->trapframe->a7 and what does that value
+    represent?
+
+a7 is 15.  a7 holds the system call number that the user program put
+there before executing ecall, and 15 is SYS_open (kernel/syscall.h).
+The first user program is init, and the first thing it does is
+open("console", O_RDWR) (user/init.c), so the first system call the
+kernel sees is open.
+
+
+Q3. What was the previous mode that the CPU was in?
+
+User mode.  sstatus was 0x200000022.  Bit 8 of sstatus is SPP, which
+records the privilege level the CPU was in before the trap: 0 means
+user mode and 1 means supervisor mode.  0x200000022 has bit 8 clear,
+so the CPU was in user mode before trapping into the kernel.
+
+
+Q4. Write down the assembly instruction the kernel is panicking at.
+    Which register corresponds to the variable num?
+
+The panic reported sepc=0x80002854, and kernel/kernel.asm shows:
+
+    num = * (int *) 0;
+    80002854:  00002683    lw  a3,0(zero)
+
+The instruction is "lw a3,0(zero)", a load from address 0.
+The variable num is in register a3.
+
+
+Q5. Why does the kernel crash?
+
+Virtual address 0 is not mapped in the kernel address space (figure
+3-3 of the book shows the kernel page table starting at 0x80000000,
+and the user part of the address space is not accessible with the
+kernel page table installed).  Dereferencing (int *) 0 therefore makes
+the hardware raise a page fault instead of returning a value.
+
+This is confirmed by the panic output: scause=0xd, which is "load page
+fault", and stval=0x0, the address that could not be translated.
+Because the fault happened in supervisor mode, kerneltrap() did not
+know how to handle it and panicked.
+
+
+Q6. What is the name of the process that was running when the kernel
+    panicked?  What is its process id (pid)?
+
+    (gdb) p p->name
+    $1 = "init", '\000' <repeats 11 times>
+    (gdb) p p->pid
+    $2 = 1
+
+The process was init, with pid 1.
